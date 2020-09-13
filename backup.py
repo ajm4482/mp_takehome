@@ -8,7 +8,7 @@ import ssl
 ###########################################################
 # * INPUT PARAMETERS                                      #
 ###########################################################
-BACKUP_TIME = "17:12"
+BACKUP_TIME = "17:35"
 BACKUP_DIR = "/home/ubuntu/backup/"
 BACKUP_S3_BUCKET = "mp-takehome-assignment"
 BACKUP_FILENAME = "backup"
@@ -89,11 +89,11 @@ def validate(file, path, bucket):
     return False
 
 
-def email(status, message, email):
+def email(status, message, receiver):
     port = 465
     password = os.getenv('EMAIL_PASSWORD')
     sender_email = os.getenv('EMAIL_ADDRESS')
-    receiver_email = email
+    receiver_email = receiver
     message = "\nSubject: Backup " + status + "\n\n" + message
 
     context = ssl.create_default_context()
@@ -102,7 +102,7 @@ def email(status, message, email):
         with smtplib.SMTP_SSL("smtp.gmail.com", port, context=context) as server:
             server.login(sender_email, password)
             server.sendmail(sender_email, receiver_email, message)
-
+        print('Notification sent to: ', receiver_email)
     except Exception as e:
         print('Email failed to send:', e)
 

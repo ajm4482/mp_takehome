@@ -8,7 +8,7 @@ import ssl
 ###########################################################
 # * INPUT PARAMETERS                                      #
 ###########################################################
-BACKUP_TIME = "17:10"
+BACKUP_TIME = "17:12"
 BACKUP_DIR = "/home/ubuntu/backup/"
 BACKUP_S3_BUCKET = "mp-takehome-assignment"
 BACKUP_FILENAME = "backup"
@@ -128,12 +128,12 @@ while True:
 
         # Upload new backup tarball to S3
         upload(filename, BACKUP_STORAGE_DIR, BACKUP_S3_BUCKET)
-
+        time.sleep(90)
         # Validate Backup
-        # if validate(filename, BACKUP_STORAGE_DIR, BACKUP_S3_BUCKET):
-        #     email('Succeeded', 'Backup Process', 'andymedinajr@gmail.com')
-        # else:
-        #     email('Failed', 'Backup Process', 'andymedinajr@gmail.com')
+        if validate(filename, BACKUP_STORAGE_DIR, BACKUP_S3_BUCKET):
+            email('Succeeded', 'Backup Process', 'andymedinajr@gmail.com')
+        else:
+            email('Failed', 'Backup Process', 'andymedinajr@gmail.com')
 
         # Sleep to prevent running again within a minute
         time.sleep(60)

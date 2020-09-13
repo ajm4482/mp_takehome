@@ -128,7 +128,7 @@ while True:
 
         # Upload new backup tarball to S3
         upload(filename, BACKUP_STORAGE_DIR, BACKUP_S3_BUCKET)
-        time.sleep(90)
+
         # Validate Backup
         if validate(filename, BACKUP_STORAGE_DIR, BACKUP_S3_BUCKET):
             email('Succeeded', 'Backup Process', 'andymedinajr@gmail.com')

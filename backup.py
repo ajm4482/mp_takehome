@@ -1,17 +1,16 @@
 import os
-import syslog
 import datetime
 import boto3
 import time
-import sys
-import smtplib, ssl
+import smtplib
+import ssl
 
 ###########################################################
 # * INPUT PARAMETERS                                      #
 ###########################################################
-BACKUP_TIME = "23:46"
-BACKUP_DIR = "/Users/andymedina/personal/mparticle/"
-BACKUP_S3_BUCKET = "mparticle-takehome-assignment"
+BACKUP_TIME = "17:10"
+BACKUP_DIR = "/home/ubuntu/backup/"
+BACKUP_S3_BUCKET = "mp-takehome-assignment"
 BACKUP_FILENAME = "backup"
 BACKUP_STORAGE_DIR = "/tmp/"
 BACKUP_RETENTION_DAYS = 7
@@ -27,8 +26,8 @@ def upload(file, filepath, bucket):
     try:
         s3.meta.client.upload_file(filepath + file, bucket, file)
         print('Uploaded ' + file + ' to s3://' + bucket)
-    except:
-        print('Backup upload failed: ', sys.exc_info()[0])
+    except Exception as e:
+        print('Backup upload failed: ', e)
 
 
 # An alternative would be to set the bucket lifecycle to 7 days
@@ -37,30 +36,32 @@ def purge_old(days, bucket):
     purge_list = []
     try:
         objects = s3.list_objects_v2(Bucket=bucket)
-
         # Create list of old backup keys
         for backup in objects['Contents']:
-            if datetime.datetime.today() - backup['LastModified'] > days:
+            if backup['LastModified'] < datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days):
                 purge_list.append({'Key': backup['Key']})
 
-        # Delete old keys
-        response = s3.delete_objects(
-            Bucket=bucket,
-            Delete={
-                'Objects': purge_list
-            }
-        )
-        print(response)
-    except:
-        print("Could not purge old backups: ", sys.exc_info()[0])
+        # Delete keys if they exist
+        if len(purge_list) > 0:
+            response = s3.delete_objects(
+                Bucket=bucket,
+                Delete={
+                    'Objects': purge_list
+                }
+            )
+            print(response)
+        else:
+            print("Nothing to purge")
+    except Exception as e:
+        print("Could not purge old backups: ", e)
 
 
 def make_tar(file, dest, source):
     try:
         # Create gzipped tarball
         os.system("tar -cpzf " + dest + file + " " + source)
-    except:
-        print("Backup creation failed: ", sys.exc_info()[0])
+    except Exception as e:
+        print("Backup creation failed: ", e)
 
     print("Backup created " + dest + file)
 
@@ -74,8 +75,8 @@ def validate(file, path, bucket):
             Prefix=file
         )
         backup = response['Contents'][0]
-    except:
-        print("Could not list s3 objects")
+    except Exception as e:
+        print("Could not list s3 objects", e)
         return False
 
     original_size = os.stat(path + file).st_size
@@ -88,14 +89,13 @@ def validate(file, path, bucket):
     return False
 
 
-def email(status, message):
+def email(status, message, email):
     port = 465
     password = os.getenv('EMAIL_PASSWORD')
     sender_email = os.getenv('EMAIL_ADDRESS')
-    receiver_email = 'andymedinajr@gmail.com'
+    receiver_email = email
     message = "\nSubject: Backup " + status + "\n\n" + message
 
-    # Create a secure SSL context
     context = ssl.create_default_context()
 
     try:
@@ -104,7 +104,7 @@ def email(status, message):
             server.sendmail(sender_email, receiver_email, message)
 
     except Exception as e:
-        print(e)
+        print('Email failed to send:', e)
 
 
 backup_hour = BACKUP_TIME.split(":")[0]
@@ -124,16 +124,16 @@ while True:
         make_tar(filename, BACKUP_STORAGE_DIR, BACKUP_DIR)
 
         # Purge old backups in S3
-        purge_old(BACKUP_RETENTION_DAYS)
+        purge_old(BACKUP_RETENTION_DAYS, BACKUP_S3_BUCKET)
 
         # Upload new backup tarball to S3
         upload(filename, BACKUP_STORAGE_DIR, BACKUP_S3_BUCKET)
 
         # Validate Backup
-        if validate(filename, BACKUP_STORAGE_DIR, BACKUP_S3_BUCKET):
-            email('Success')
-        else:
-            email('Failed')
+        # if validate(filename, BACKUP_STORAGE_DIR, BACKUP_S3_BUCKET):
+        #     email('Succeeded', 'Backup Process', 'andymedinajr@gmail.com')
+        # else:
+        #     email('Failed', 'Backup Process', 'andymedinajr@gmail.com')
 
         # Sleep to prevent running again within a minute
         time.sleep(60)

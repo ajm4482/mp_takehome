@@ -4,32 +4,44 @@ import boto3
 import time
 import smtplib
 import ssl
+import logging as log
 
 ###########################################################
 # * INPUT PARAMETERS                                      #
 ###########################################################
-BACKUP_TIME = "17:35"
+BACKUP_TIME = "18:20"
 BACKUP_DIR = "/home/ubuntu/backup/"
 BACKUP_S3_BUCKET = "mp-takehome-assignment"
 BACKUP_FILENAME = "backup"
 BACKUP_STORAGE_DIR = "/tmp/"
 BACKUP_RETENTION_DAYS = 7
-
+SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
+SMTP_ADDRESS = os.getenv('SMTP_ADDRESS')
+SMTP_SERVER = 'smtp.gmail.com'
 
 ###########################################################
-###########################################################
+# * LOGGING CONFIGURATION                                 #
+##########################################################
+
+log.basicConfig(filename=BACKUP_FILENAME + '.log', level=log.INFO, format='%(asctime)s %(message)s')
 
 
+###############################################################
+#  * UPLOADS A FILE IN THE SYSTEM DIRECTORY TO AN S3 BUCKET   #
+###############################################################
 def upload(file, filepath, bucket):
     s3 = boto3.resource('s3')
 
     try:
         s3.meta.client.upload_file(filepath + file, bucket, file)
-        print('Uploaded ' + file + ' to s3://' + bucket)
+        log.info('Uploading ' + file + ' to s3://' + bucket)
     except Exception as e:
-        print('Backup upload failed: ', e)
+        log.error('Backup upload failed: ' + e)
 
 
+###############################################################
+# * PURGES OBJECTS IN AN S3 BUCKET OLDER THAN 'X' DAYS        #
+###############################################################
 # An alternative would be to set the bucket lifecycle to 7 days
 def purge_old(days, bucket):
     s3 = boto3.client('s3')
@@ -49,23 +61,31 @@ def purge_old(days, bucket):
                     'Objects': purge_list
                 }
             )
-            print(response)
+            log.info(response)
         else:
-            print("Nothing to purge")
+            log.info("Nothing to purge")
     except Exception as e:
-        print("Could not purge old backups: ", e)
+        log.error("Could not purge old backups: " + e)
 
 
-def make_tar(file, dest, source):
+############################################################
+# * CREATES A ZIPPED TARBALL OF A SYSTEM DIRECTORY         #
+# * AND STORES IT IN DESTINATION DIRECTORY                 #
+############################################################
+def make_tar(file, dest, source_dir):
     try:
         # Create gzipped tarball
-        os.system("tar -cpzf " + dest + file + " " + source)
+        os.system("tar -cpzf " + dest + file + " " + source_dir)
     except Exception as e:
-        print("Backup creation failed: ", e)
+        log.error("Backup creation failed: " + e)
 
-    print("Backup created " + dest + file)
+    log.info("Backup created " + dest + file)
 
 
+###########################################################
+# * VALIDATES THE EXISTENCE OF A FILE IN AN S3 BUCKET     #
+# * ALSO CHECKS FOR MATCHING FILE SIZE                    #
+###########################################################
 def validate(file, path, bucket):
     s3 = boto3.client('s3')
 
@@ -76,7 +96,7 @@ def validate(file, path, bucket):
         )
         backup = response['Contents'][0]
     except Exception as e:
-        print("Could not list s3 objects", e)
+        log.error("Could not validate file in S3: " + e)
         return False
 
     original_size = os.stat(path + file).st_size
@@ -89,24 +109,31 @@ def validate(file, path, bucket):
     return False
 
 
+###########################################################
+# * EMAILS A STATUS AND MESSAGE TO AN ADDRESS             #
+###########################################################
 def email(status, message, receiver):
     port = 465
-    password = os.getenv('EMAIL_PASSWORD')
-    sender_email = os.getenv('EMAIL_ADDRESS')
+    password = SMTP_PASSWORD
+    sender_email = SMTP_ADDRESS
     receiver_email = receiver
     message = "\nSubject: Backup " + status + "\n\n" + message
 
     context = ssl.create_default_context()
 
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", port, context=context) as server:
+        with smtplib.SMTP_SSL(SMTP_SERVER, port, context=context) as server:
             server.login(sender_email, password)
             server.sendmail(sender_email, receiver_email, message)
-        print('Notification sent to: ', receiver_email)
+
+        log.info('Notification sent to: ' + receiver_email)
     except Exception as e:
-        print('Email failed to send:', e)
+        log.warning('Notification failed to send:' + e)
 
 
+###########################################################
+# * MAIN SCRIPT                                           #
+###########################################################
 backup_hour = BACKUP_TIME.split(":")[0]
 backup_minute = BACKUP_TIME.split(":")[1]
 
@@ -129,11 +156,14 @@ while True:
         # Upload new backup tarball to S3
         upload(filename, BACKUP_STORAGE_DIR, BACKUP_S3_BUCKET)
 
+        # Allow for file to replicate in S3
+        time.sleep(30)
+
         # Validate Backup
         if validate(filename, BACKUP_STORAGE_DIR, BACKUP_S3_BUCKET):
-            email('Succeeded', 'Backup Process', 'andymedinajr@gmail.com')
+            email('Succeeded', 'Backup Process', 'andymedina@utexas.edu')
         else:
-            email('Failed', 'Backup Process', 'andymedinajr@gmail.com')
+            email('Failed', 'Backup Process', 'andymedina@utexas.edu')
 
         # Sleep to prevent running again within a minute
         time.sleep(60)

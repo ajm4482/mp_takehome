@@ -89,22 +89,24 @@ def make_tar(file, dest, source_dir):
 def validate(file, path, bucket):
     s3 = boto3.client('s3')
 
+    # Retrieve Bucket contents with file name
     try:
         response = s3.list_objects_v2(
             Bucket=bucket,
             Prefix=file
         )
         backup = response['Contents'][0]
+
+        original_size = os.stat(path + file).st_size
+        backup_size = backup['Size']
+        backup_name = backup['Key']
+
+        # Check if file exists and same size
+        if backup_name == file and original_size == backup_size:
+            return True
+
     except Exception as e:
         log.error("Could not validate file in S3: " + e)
-        return False
-
-    original_size = os.stat(path + file).st_size
-    backup_size = backup['Size']
-    backup_name = backup['Key']
-
-    if backup_name == file and original_size == backup_size:
-        return True
 
     return False
 
@@ -122,6 +124,7 @@ def email(status, message, receiver):
     context = ssl.create_default_context()
 
     try:
+        # Send Email
         with smtplib.SMTP_SSL(SMTP_SERVER, port, context=context) as server:
             server.login(sender_email, password)
             server.sendmail(sender_email, receiver_email, message)

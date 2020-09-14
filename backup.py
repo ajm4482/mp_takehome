@@ -10,15 +10,16 @@ import subprocess
 ###########################################################
 # * INPUT PARAMETERS                                      #
 ###########################################################
-BACKUP_TIME = "19:09"
+BACKUP_TIME = "00:00"
 BACKUP_DIR = "/home/ubuntu/backup/"
 BACKUP_S3_BUCKET = "mp-takehome-assignment"
 BACKUP_FILENAME = "backup"
 BACKUP_STORAGE_DIR = "/tmp/"
 BACKUP_RETENTION_DAYS = 7
+SMTP_SERVER = 'smtp.gmail.com'
+
 SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
 SMTP_ADDRESS = os.getenv('SMTP_ADDRESS')
-SMTP_SERVER = 'smtp.gmail.com'
 
 ###########################################################
 # * LOGGING CONFIGURATION                                 #

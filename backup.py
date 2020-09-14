@@ -5,11 +5,12 @@ import time
 import smtplib
 import ssl
 import logging as log
+import subprocess
 
 ###########################################################
 # * INPUT PARAMETERS                                      #
 ###########################################################
-BACKUP_TIME = "18:20"
+BACKUP_TIME = "19:09"
 BACKUP_DIR = "/home/ubuntu/backup/"
 BACKUP_S3_BUCKET = "mp-takehome-assignment"
 BACKUP_FILENAME = "backup"
@@ -35,8 +36,10 @@ def upload(file, filepath, bucket):
     try:
         s3.meta.client.upload_file(filepath + file, bucket, file)
         log.info('Uploading ' + file + ' to s3://' + bucket)
-    except Exception as e:
-        log.error('Backup upload failed: ' + e)
+    except FileNotFoundError:
+        log.error('Backup file not found')
+    except:
+        log.error('Backup upload failed')
 
 
 ###############################################################
@@ -63,9 +66,9 @@ def purge_old(days, bucket):
             )
             log.info(response)
         else:
-            log.info("Nothing to purge")
-    except Exception as e:
-        log.error("Could not purge old backups: " + e)
+            log.info('Nothing to purge')
+    except:
+        log.error('Could not purge old backups')
 
 
 ############################################################
@@ -75,11 +78,10 @@ def purge_old(days, bucket):
 def make_tar(file, dest, source_dir):
     try:
         # Create gzipped tarball
-        os.system("tar -cpzf " + dest + file + " " + source_dir)
-    except Exception as e:
-        log.error("Backup creation failed: " + e)
-
-    log.info("Backup created " + dest + file)
+        subprocess.call(['tar', '-cpzf', dest + file, source_dir])
+        log.info('Backup created ' + dest + file)
+    except:
+        log.error('Backup creation failed')
 
 
 ###########################################################
@@ -105,8 +107,8 @@ def validate(file, path, bucket):
         if backup_name == file and original_size == backup_size:
             return True
 
-    except Exception as e:
-        log.error("Could not validate file in S3: " + e)
+    except:
+        log.error('Could not validate file in S3')
 
     return False
 
@@ -130,8 +132,8 @@ def email(status, message, receiver):
             server.sendmail(sender_email, receiver_email, message)
 
         log.info('Notification sent to: ' + receiver_email)
-    except Exception as e:
-        log.warning('Notification failed to send:' + e)
+    except:
+        log.warning('Notification failed to send')
 
 
 ###########################################################

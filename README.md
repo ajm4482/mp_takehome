@@ -28,3 +28,7 @@
 python3 backup.py &
 ```
 
+### Alternatively
+- Create a Systemd service for the script and enable it
+- Use monit to assure process is running
+- Use cron to start on boot
